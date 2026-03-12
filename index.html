@@ -13,36 +13,36 @@
         .wrapper { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
         @media (min-width: 1000px) { .wrapper { display: grid; grid-template-columns: 1fr 400px; } }
 
-        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow: hidden; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow: hidden; display: flex; flex-direction: column; }
         h2 { font-size: 1.1em; margin: 0 0 12px 0; border-left: 4px solid var(--accent); padding-left: 10px; }
 
-        /* スクロールを発生させるための外枠 */
-        #calendar-scroll-wrapper {
-            width: 100%;
-            overflow-x: auto; /* ここでスクロールを制御 */
-            -webkit-overflow-scrolling: touch;
-            border: 1px solid #eee;
+        /* スケジュールエリア */
+        #calendar-scroll-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #eee; border-radius: 8px; background: #fff; }
+        #calendar-container { min-height: 450px; height: 60vh; }
+        #calendar { min-width: 100%; height: 100% !important; }
+
+        /* マネーレポート：履歴スクロールの強化 */
+        .history-container { 
+            max-height: 400px; /* ここで高さを固定 */
+            overflow-y: auto;  /* 縦スクロールを許可 */
+            border: 1px solid #f0f0f0;
             border-radius: 8px;
-            background: #fff;
+            padding: 5px 10px;
+            margin-top: 10px;
+            background: #fafafa;
+            -webkit-overflow-scrolling: touch; /* iOSの慣性スクロール */
         }
 
-        #calendar-container { 
-            min-height: 500px; 
-            height: 70vh; 
-        }
+        /* スクロールバーのデザイン（PC/一部のスマホ用） */
+        .history-container::-webkit-scrollbar { width: 6px; }
+        .history-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        .history-container::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
 
-        /* カレンダー自体の幅（JSで可変にするが初期値は100%） */
-        #calendar { 
-            min-width: 100%; 
-            height: 100% !important; 
-        }
+        .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .history-row:last-child { border-bottom: none; }
 
-        /* ツールバーの見た目調整 */
-        .fc .fc-toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 10px !important; }
-        .fc .fc-toolbar-title { font-size: 1em !important; width: 100%; text-align: center; order: -1; }
-        .fc .fc-button { padding: 5px 8px !important; font-size: 0.75em !important; }
-
-        .input-box { background: #f8f9fa; padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
+        /* その他UI要素 */
+        .input-box { background: #f8f9fa; padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
         .flex-row { display: flex; gap: 5px; flex-wrap: wrap; }
         input, select, button { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; flex: 1; min-width: 45%; }
         button { background: var(--accent); color: white; border: none; font-weight: bold; cursor: pointer; }
@@ -53,8 +53,6 @@
         .report-item { padding: 10px; border-radius: 8px; text-align: center; font-size: 0.85em; }
         .inc-box { background: #e8f5e9; color: var(--success); }
         .exp-box { background: #ffebee; color: var(--danger); }
-        .history-container { max-height: 200px; overflow-y: auto; font-size: 0.85em; border-top: 1px solid #eee; margin-top: 5px; }
-        .history-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f9f9f9; }
         .del-btn { background: #eee; color: #999; border-radius: 50%; width: 24px; height: 24px; min-width: 24px; padding: 0; font-size: 14px; margin-left: 10px; }
 
         .data-tools { margin-top: 10px; display: flex; justify-content: center; gap: 8px; }
@@ -114,36 +112,28 @@
 
 <script>
     let calendar;
-    const KEY_T = 'life_biz_v14_tasks';
-    const KEY_M = 'life_biz_v14_money';
+    const KEY_T = 'life_biz_v15_tasks';
+    const KEY_M = 'life_biz_v15_money';
 
     document.addEventListener('DOMContentLoaded', function() {
-        const calendarEl = document.getElementById('calendar');
-        
-        calendar = new FullCalendar.Calendar(calendarEl, {
+        calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
             initialView: 'dayGridMonth',
             locale: 'ja',
             height: '100%',
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,timeGridWeek,listMonth'
-            },
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listMonth' },
             buttonText: { month: '月', week: '週', list: '予定' },
-            // 表示が切り替わった時に実行される処理
             datesSet: function(info) {
                 const calTable = document.getElementById('calendar');
-                // スマホ（幅768px以下）かつ「週」または「日」表示のとき
                 if (window.innerWidth < 768 && (info.view.type === 'timeGridWeek' || info.view.type === 'timeGridDay')) {
-                    calTable.style.width = '800px'; // 幅を強制的に広げる
+                    calTable.style.width = '800px';
                 } else {
-                    calTable.style.width = '100%'; // それ以外は画面幅に合わせる
+                    calTable.style.width = '100%';
                 }
-                calendar.updateSize(); // サイズ変更を通知
+                calendar.updateSize();
             },
             events: JSON.parse(localStorage.getItem(KEY_T) || '[]'),
             eventClick: (info) => {
-                if (confirm(`予定「${info.event.title}」を削除しますか？`)) {
+                if (confirm(`削除しますか？`)) {
                     info.event.remove();
                     let data = JSON.parse(localStorage.getItem(KEY_T) || '[]');
                     data = data.filter(i => !(i.title === info.event.title && i.start === info.event.startStr));
@@ -158,10 +148,9 @@
             const date = document.getElementById('t-date').value;
             const time = document.getElementById('t-time').value;
             if(!title || !date) return alert("入力不足");
-            const color = document.getElementById('t-priority').value === 'high' ? '#e74c3c' : '#3498db';
-            const newEv = { title, start: `${date}T${time}:00`, backgroundColor: color, borderColor: 'transparent' };
+            const newEv = { title, start: `${date}T${time}:00`, backgroundColor: document.getElementById('t-priority').value === 'high' ? '#e74c3c' : '#3498db', borderColor: 'transparent' };
             calendar.addEvent(newEv);
-            const data = JSON.parse(localStorage.getItem(KEY_T) || '[]');
+            let data = JSON.parse(localStorage.getItem(KEY_T) || '[]');
             data.push(newEv);
             localStorage.setItem(KEY_T, JSON.stringify(data));
             document.getElementById('t-title').value = '';
@@ -176,7 +165,7 @@
             const amount = parseInt(document.getElementById('m-amount').value);
             const date = document.getElementById('m-date').value;
             if(!title || isNaN(amount) || !date) return alert("入力エラー");
-            const data = JSON.parse(localStorage.getItem(KEY_M) || '[]');
+            let data = JSON.parse(localStorage.getItem(KEY_M) || '[]');
             data.push({ id: Date.now(), title, amount, date, monthKey: `${new Date(date).getFullYear()}-${new Date(date).getMonth() + 1}` });
             localStorage.setItem(KEY_M, JSON.stringify(data));
             refreshMoneyUI();
@@ -217,11 +206,12 @@
     }
 
     function deleteMoney(id) {
-        if (!confirm("削除しますか？")) return;
-        let data = JSON.parse(localStorage.getItem(KEY_M) || '[]');
-        data = data.filter(item => item.id !== id);
-        localStorage.setItem(KEY_M, JSON.stringify(data));
-        refreshMoneyUI();
+        if (confirm("削除しますか？")) {
+            let data = JSON.parse(localStorage.getItem(KEY_M) || '[]');
+            data = data.filter(item => item.id !== id);
+            localStorage.setItem(KEY_M, JSON.stringify(data));
+            refreshMoneyUI();
+        }
     }
 
     function exportData() {
